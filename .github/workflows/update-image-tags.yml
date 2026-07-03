@@ -49,6 +49,8 @@ jobs:
           fi
 
           if [ -z "${SERVICES}" ]; then
+            echo "No services specified — updating all services"
+            SERVICES="config-server discovery-server api-gateway customers-service visits-service vets-service genai-service admin-server"
             echo "::error::Missing 'services' in repository_dispatch payload"
             exit 1
           fi
