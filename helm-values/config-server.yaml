@@ -1,0 +1,69 @@
+# Config Server — Spring Cloud Config Server
+# Port: 8888 (actuator health)
+# No init containers (doesn't need DB)
+# No MySQL — Git-backed config only
+
+name: config-server
+namespace: "petclinic-dev"
+component: server
+
+replicaCount: 1
+
+image:
+  repository: "478468080326.dkr.ecr.us-east-1.amazonaws.com/petclinic-dev/config-server"
+  tag: "85ed54d"
+  pullPolicy: Always
+
+service:
+  port: 8888
+
+serviceAccount:
+  name: config-server-sa
+
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: docker
+  - name: GIT_REPO
+    value: "https://github.com/spring-petclinic/spring-petclinic-microservices-config"
+
+configMap:
+  SPRING_PROFILES_ACTIVE: docker
+  GIT_REPO: "https://github.com/spring-petclinic/spring-petclinic-microservices-config"
+
+probes:
+  readiness:
+    path: /actuator/health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 5
+  liveness:
+    path: /actuator/health
+    initialDelaySeconds: 60
+    periodSeconds: 15
+    failureThreshold: 3
+    timeoutSeconds: 5
+
+startupProbe:
+  enabled: true
+  path: /actuator/health
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  failureThreshold: 30
+  timeoutSeconds: 5
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+
+podDisruptionBudget:
+  enabled: false

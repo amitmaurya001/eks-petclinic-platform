@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: genai-service
+    namespace: petclinic-dev
+    labels:
+        app: genai-service
+        version: latest
+        tier: backend
+        app.kubernetes.io/name: genai-service
+        app.kubernetes.io/part-of: petclinic
+        app.kubernetes.io/managed-by: Helm
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: genai-service
+            app.kubernetes.io/part-of: petclinic
+    template:
+        metadata:
+            labels:
+                app: genai-service
+                version: latest
+                tier: backend
+                app.kubernetes.io/name: genai-service
+                app.kubernetes.io/part-of: petclinic
+                app.kubernetes.io/managed-by: Helm
+        spec:
+            serviceAccountName: genai-service
+            securityContext:
+                runAsNonRoot: true
+                runAsUser: 1000
+                fsGroup: 1000
+                seccompProfile:
+                    type: RuntimeDefault
+            initContainers:
+                - name: wait-for-config-server
+                  image: busybox:1.36
+                  command:
+                      - sh
+                      - -c
+                      - |
+                          until wget -q --spider http://config-server:8888/actuator/health 2>/dev/null; do
+                            echo "Waiting for config-server..."
+                            sleep 5
+                          done
+                          echo "Config-server is ready"
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                          drop:
+                              - ALL
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                - name: wait-for-discovery-server
+                  image: busybox:1.36
+                  command:
+                      - sh
+                      - -c
+                      - |
+                          until wget -q --spider http://discovery-server:8761/actuator/health 2>/dev/null; do
+                            echo "Waiting for discovery-server..."
+                            sleep 5
+                          done
+                          echo "Discovery-server is ready"
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                          drop:
+                              - ALL
+                      runAsNonRoot: true
+                      runAsUser: 1000
+            containers:
+                - name: genai-service
+                  image: 478468080326.dkr.ecr.us-east-1.amazonaws.com/petclinic-dev/genai-service:85ed54d
+                  imagePullPolicy: Always
+                  ports:
+                      - containerPort: 8084
+                        protocol: TCP
+                  env:
+                      - name: SPRING_PROFILES_ACTIVE
+                        value: docker
+                      - name: CONFIG_SERVER_URL
+                        value: http://config-server:8888
+                      - name: OPENAI_API_KEY
+                        valueFrom:
+                            secretKeyRef:
+                                name: openai-api-key
+                                key: OPENAI_API_KEY
+                  startupProbe:
+                      httpGet:
+                          path: /actuator/health
+                          port: 8084
+                      periodSeconds: 10
+                      failureThreshold: 30
+                  readinessProbe:
+                      httpGet:
+                          path: /actuator/health/readiness
+                          port: 8084
+                      periodSeconds: 10
+                      failureThreshold: 3
+                  livenessProbe:
+                      httpGet:
+                          path: /actuator/health/liveness
+                          port: 8084
+                      periodSeconds: 15
+                      failureThreshold: 3
+                  resources:
+                      requests:
+                          cpu: 100m
+                          memory: 128Mi
+                      limits:
+                          cpu: 500m
+                          memory: 512Mi
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                          drop:
+                              - ALL
+                      readOnlyRootFilesystem: false
+---

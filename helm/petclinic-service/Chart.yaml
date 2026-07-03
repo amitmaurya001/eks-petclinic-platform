@@ -1,0 +1,7 @@
+apiVersion: v2
+name: petclinic-service
+description: A generic Helm chart for Spring Petclinic microservices — shared by all 8 services
+type: application
+version: 0.1.0
+appVersion: "4.0.1"
+icon: https://spring.io/img/spring-identity.svg

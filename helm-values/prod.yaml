@@ -1,0 +1,39 @@
+# Prod environment overrides
+# Prod: replicas=2, HPA enabled, PDB enabled, higher resources
+
+namespace: petclinic-prod
+
+replicaCount: 2
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1024Mi
+
+# HPA per-service (matching existing prod overlay)
+# config-server: minReplicas=2, maxReplicas=4
+# discovery-server: minReplicas=2, maxReplicas=4
+# api-gateway: minReplicas=2, maxReplicas=6
+# customers-service: minReplicas=2, maxReplicas=4
+# visits-service: minReplicas=2, maxReplicas=4
+# vets-service: minReplicas=2, maxReplicas=4
+# genai-service: minReplicas=1, maxReplicas=3
+# admin-server: minReplicas=1, maxReplicas=4
+
+database:
+  url: "jdbc:mysql://petclinic-prod-mysql.cc50gsw4c4fq.us-east-1.rds.amazonaws.com:3306/petclinic"
+
+

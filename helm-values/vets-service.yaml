@@ -1,0 +1,82 @@
+# Vets Service — Vet data (+ Caffeine cache)
+# Port: 8083
+# MySQL-backed (yes)
+# Init: wait-for-config-server, wait-for-discovery-server
+# Secret ref: rds-credentials (envFrom)
+# Env: uses CONFIG_SERVER_URL + SPRING_DATASOURCE_URL
+# Profiles: docker,mysql
+
+name: vets-service
+namespace: "petclinic-dev"
+component: service
+
+replicaCount: 1
+
+image:
+  repository: "478468080326.dkr.ecr.us-east-1.amazonaws.com/petclinic-dev/vets-service"
+  tag: "85ed54d"
+  pullPolicy: Always
+
+service:
+  port: 8083
+
+serviceAccount:
+  name: vets-service-sa
+
+initContainers:
+  - name: wait-for-config-server
+    image: busybox:1.36
+    waitFor: config-server
+  - name: wait-for-discovery-server
+    image: busybox:1.36
+    waitFor: discovery-server
+
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: docker,mysql
+  - name: CONFIG_SERVER_URL
+    value: http://config-server:8888
+
+
+envFrom:
+  - secretRef:
+      name: rds-credentials
+
+configMap:
+  CONFIG_SERVER_URL: http://config-server:8888
+
+probes:
+  readiness:
+    path: /actuator/health/readiness
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 5
+  liveness:
+    path: /actuator/health/liveness
+    initialDelaySeconds: 60
+    periodSeconds: 15
+    failureThreshold: 3
+    timeoutSeconds: 5
+
+startupProbe:
+  enabled: true
+  path: /actuator/health
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  failureThreshold: 30
+  timeoutSeconds: 5
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false

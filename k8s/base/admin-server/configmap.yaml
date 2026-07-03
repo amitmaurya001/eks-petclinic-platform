@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: admin-server-config
+  namespace: petclinic-dev
+  labels:
+    app: admin-server
+    component: admin
+    app.kubernetes.io/name: admin-server
+    app.kubernetes.io/part-of: petclinic
+    app.kubernetes.io/managed-by: Helm
+data:
+  CONFIG_SERVER_URL: http://config-server:8888
+---

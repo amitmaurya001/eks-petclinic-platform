@@ -1,0 +1,136 @@
+# Update Image Tags Workflow
+# ==========================
+#
+# Triggered by: repository_dispatch event from the app repo (eks-spring-petclinic)
+#   build-push.yml sends: repository_dispatch with type 'app-image-built'
+#   payload: { sha: "<short-sha>", services: "<space-separated>" }
+#
+# What it does:
+#   1. Receives the commit SHA and list of built services from the dispatch payload
+#   2. Updates image.tag in helm-values/{service}.yaml for each built service
+#      using yq (the portable YAML/JSON/XML processor)
+#   3. Commits and pushes the updated helm-values files back to the platform repo
+#
+# ArgoCD watches the platform repo for changes to helm-values/ and auto-syncs
+# the updated image tags to the EKS cluster (dev auto-sync, prod requires approval).
+#
+# Trigger: repository_dispatch event type app-image-built — NOT workflow_run
+
+name: Update Image Tags
+
+on:
+  repository_dispatch:
+    types: [app-image-built]
+
+env:
+  PLATFORM_REPO: amitmaurya001/eks-petclinic-platform
+  HELM_VALUES_DIR: helm-values
+
+jobs:
+  update-tags:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    # Required for git commit + push
+      id-token: write     # Required for OIDC auth
+
+    steps:
+      # ----------------------------------------------------------------
+      # Step 1: Validate payload
+      # ----------------------------------------------------------------
+      - name: Validate dispatch payload
+        id: validate
+        run: |
+          SHA="${{ github.event.client_payload.sha }}"
+          SERVICES="${{ github.event.client_payload.services }}"
+
+          if [ -z "${SHA}" ]; then
+            echo "::error::Missing 'sha' in repository_dispatch payload"
+            exit 1
+          fi
+
+          if [ -z "${SERVICES}" ]; then
+            echo "::error::Missing 'services' in repository_dispatch payload"
+            exit 1
+          fi
+
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "services=${SERVICES}" >> "$GITHUB_OUTPUT"
+
+          echo "Received dispatch: SHA=${SHA}, Services=${SERVICES}"
+
+      # ----------------------------------------------------------------
+      # Step 2: Checkout the platform repo (petclinic-platform)
+      # ----------------------------------------------------------------
+      - name: Checkout platform repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PLATFORM_REPO }}
+          ref: main
+          token: ${{ secrets.PLATFORM_REPO_TOKEN }}
+
+      # ----------------------------------------------------------------
+      # Step 3: Install yq (portable YAML processor)
+      # ----------------------------------------------------------------
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64"
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      # ----------------------------------------------------------------
+      # Step 4: Update image.tag for each service in the dispatch payload
+      # ----------------------------------------------------------------
+      - name: Update image tags in helm-values
+        id: update-tags
+        run: |
+          SHA="${{ steps.validate.outputs.sha }}"
+          SERVICES="${{ steps.validate.outputs.services }}"
+          UPDATED_FILES=""
+
+          for service in ${SERVICES}; do
+            FILE="${HELM_VALUES_DIR}/${service}.yaml"
+
+            if [ ! -f "${FILE}" ]; then
+              echo "::warning::Service file ${FILE} not found — skipping"
+              continue
+            fi
+
+            echo "Updating image.tag in ${FILE} → ${SHA}"
+            yq -i ".image.tag = \"${SHA}\"" "${FILE}"
+            UPDATED_FILES="${UPDATED_FILES} ${service}.yaml"
+          done
+
+          if [ -z "${UPDATED_FILES}" ]; then
+            echo "::error::No service files were updated — aborting"
+            exit 1
+          fi
+
+          echo "updated=${UPDATED_FILES}" >> "$GITHUB_OUTPUT"
+
+      # ----------------------------------------------------------------
+      # Step 5: Commit and push
+      # ----------------------------------------------------------------
+      - name: Commit and push updated tags
+        run: |
+          git config user.name "petclinic-ci-bot"
+          git config user.email "ci-bot@petclinic.dev"
+
+          SHA="${{ steps.validate.outputs.sha }}"
+          UPDATED="${{ steps.update-tags.outputs.updated }}"
+          SERVICES="${{ steps.validate.outputs.services }}"
+
+          git add helm-values/
+          if git diff --cached --quiet; then
+            echo "No changes to commit — all tags already match ${SHA}"
+            exit 0
+          fi
+
+          git commit \
+            -m "ci: update image tags to ${SHA}" \
+            -m "Triggered by: repository_dispatch (app-image-built)" \
+            -m "Services updated: ${SERVICES}" \
+            -m "Files: ${UPDATED}"
+
+          git push origin main
+          echo "Pushed to ${PLATFORM_REPO} — ArgoCD will detect and sync"

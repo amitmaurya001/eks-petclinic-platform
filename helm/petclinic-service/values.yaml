@@ -1,0 +1,74 @@
+# Default values for petclinic-service chart
+# Overridden per-service via helm-values/{service}.yaml
+# Overridden per-environment via helm-values/{env}.yaml
+
+replicaCount: 1
+
+image:
+  repository: ""
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+probes:
+  readiness:
+    path: /actuator/health/readiness
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 5
+  liveness:
+    path: /actuator/health/liveness
+    initialDelaySeconds: 60
+    periodSeconds: 15
+    failureThreshold: 3
+    timeoutSeconds: 5
+
+startupProbe:
+  enabled: true
+  path: /actuator/health
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  failureThreshold: 30
+  timeoutSeconds: 5
+
+env: []
+envFrom: []
+
+initContainers: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+volumes: []
+volumeMounts: []
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1

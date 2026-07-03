@@ -1,0 +1,25 @@
+# Dev environment overrides
+# Dev: replicas=1, no HPA, no PDB, smaller resources
+
+namespace: petclinic-dev
+
+replicaCount: 1
+
+autoscaling:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+database:
+  url: "jdbc:mysql://petclinic-dev-mysql.cc50gsw4c4fq.us-east-1.rds.amazonaws.com:3306/petclinic"
+
+

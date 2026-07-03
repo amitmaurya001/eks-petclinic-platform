@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: petclinic-dev
+  labels:
+    app: api-gateway
+    component: gateway
+    tier: frontend
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/part-of: petclinic
+    app.kubernetes.io/managed-by: Helm
+data:
+  CONFIG_SERVER_URL: http://config-server:8888

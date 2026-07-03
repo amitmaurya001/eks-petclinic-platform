@@ -1,0 +1,89 @@
+# Reusable — Update Image Tags in Helm Values
+# =============================================
+#
+# Receives a repository_dispatch payload and updates image.tag in
+# helm-values/{service}.yaml for the services in the payload.
+#
+# Called by: the platform repo's update-image-tags.yml (repository_dispatch handler)
+#   or manually via workflow_dispatch for emergency tag updates.
+#
+# This workflow lives in the platform repo (petclinic-platform/.github/workflows/reusable/)
+# because it needs write access to the platform repo's helm-values/ directory.
+#
+# Usage (in platform repo):
+#   jobs:
+#     update-tags:
+#       uses: ./.github/workflows/reusable/update-tags.yml
+#       with:
+#         sha: a1b2c3d
+#         services: "config-server customers-service"
+#
+# Inputs:
+#   sha:       7-character commit SHA to write as image.tag
+#   services:  space-separated list of service names (e.g. "config-server customers-service")
+#
+# Secrets required:
+#   GIT_PUSH_TOKEN:   PAT with write access to the platform repo
+
+name: Reusable — Update Image Tags
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: "7-character commit SHA to set as image.tag"
+        required: true
+        type: string
+      services:
+        description: "Space-separated list of service names to update"
+        required: true
+        type: string
+    secrets:
+      GIT_PUSH_TOKEN:
+        description: "GitHub PAT with write access to the platform repo"
+        required: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout platform repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GIT_PUSH_TOKEN }}
+          ref: main
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64"
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Update image tags
+        id: update
+        run: |
+          SHA="${{ inputs.sha }}"
+          SERVICES="${{ inputs.services }}"
+          UPDATED=""
+
+          for service in ${SERVICES}; do
+            FILE="helm-values/${service}.yaml"
+            if [ ! -f "${FILE}" ]; then
+              echo "::warning::${FILE} not found — skipping"
+              continue
+            fi
+            yq -i ".image.tag = \"${SHA}\"" "${FILE}"
+            UPDATED="${UPDATED} ${FILE}"
+          done
+
+          echo "updated=${UPDATED}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        run: |
+          git config user.name "petclinic-ci-bot"
+          git config user.email "ci-bot@petclinic.dev"
+          git add helm-values/
+          git diff --cached --quiet && echo "No changes" || git commit \
+            -m "ci: update image tags to ${{ inputs.sha }} (${{ inputs.services }})"
+          git push origin main

@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: petclinic-dev
+
+resources:
+  - ../../base/config-server/
+  - ../../base/discovery-server/
+  - ../../base/api-gateway/
+  - ../../base/customers-service/
+  - ../../base/visits-service/
+  - ../../base/vets-service/
+  - ../../base/genai-service/
+  - ../../base/admin-server/
+  - external-secrets/
+
+replicas:
+  - name: config-server
+    count: 1
+  - name: discovery-server
+    count: 1
+  - name: api-gateway
+    count: 1
+  - name: customers-service
+    count: 1
+  - name: visits-service
+    count: 1
+  - name: vets-service
+    count: 1
+  - name: genai-service
+    count: 1
+  - name: admin-server
+    count: 1

@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: api-gateway
+    namespace: petclinic-dev
+    labels:
+        app: api-gateway
+        component: gateway
+        tier: frontend
+        app.kubernetes.io/name: api-gateway
+        app.kubernetes.io/part-of: petclinic
+        app.kubernetes.io/managed-by: Helm
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: api-gateway
+            app.kubernetes.io/part-of: petclinic
+    template:
+        metadata:
+            labels:
+                app: api-gateway
+                component: gateway
+                tier: frontend
+                app.kubernetes.io/name: api-gateway
+                app.kubernetes.io/part-of: petclinic
+                app.kubernetes.io/managed-by: Helm
+        spec:
+            initContainers:
+                - name: wait-for-config-server
+                  image: busybox:1.36
+                  command:
+                      - /bin/sh
+                      - -c
+                      - |
+                          echo "Waiting for config-server on http://config-server:8888/actuator/health ..."
+                          until wget -q --spider http://config-server:8888/actuator/health 2>/dev/null; do
+                            echo "config-server not ready, sleeping 2s..."
+                            sleep 2
+                          done
+                          echo "config-server is ready."
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                          drop:
+                              - ALL
+                      readOnlyRootFilesystem: true
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                - name: wait-for-discovery-server
+                  image: busybox:1.36
+                  command:
+                      - /bin/sh
+                      - -c
+                      - |
+                          echo "Waiting for discovery-server on http://discovery-server:8761/actuator/health ..."
+                          until wget -q --spider http://discovery-server:8761/actuator/health 2>/dev/null; do
+                            echo "discovery-server not ready, sleeping 2s..."
+                            sleep 2
+                          done
+                          echo "discovery-server is ready."
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                          drop:
+                              - ALL
+                      readOnlyRootFilesystem: true
+                      runAsNonRoot: true
+                      runAsUser: 1000
+            containers:
+                - name: api-gateway
+                  image: 478468080326.dkr.ecr.us-east-1.amazonaws.com/petclinic-dev/api-gateway:85ed54d
+                  imagePullPolicy: Always
+                  ports:
+                      - containerPort: 8080
+                        protocol: TCP
+                  env:
+                      - name: SPRING_PROFILES_ACTIVE
+                        value: docker
+                      - name: CONFIG_SERVER_URL
+                        value: http://config-server:8888
+                  startupProbe:
+                      httpGet:
+                          path: /actuator/health
+                          port: 8080
+                      periodSeconds: 10
+                      failureThreshold: 30
+                  readinessProbe:
+                      httpGet:
+                          path: /actuator/health/readiness
+                          port: 8080
+                      periodSeconds: 10
+                      failureThreshold: 3
+                  livenessProbe:
+                      httpGet:
+                          path: /actuator/health/liveness
+                          port: 8080
+                      periodSeconds: 15
+                      failureThreshold: 3
+                  resources:
+                      requests:
+                          cpu: 200m
+                          memory: 128Mi
+                      limits:
+                          cpu: 1000m
+                          memory: 512Mi
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                          drop:
+                              - ALL
+                      readOnlyRootFilesystem: false
+            securityContext:
+                runAsNonRoot: true
+                runAsUser: 1000
+                fsGroup: 1000
+                seccompProfile:
+                    type: RuntimeDefault

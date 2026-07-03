@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: genai-service
+  namespace: petclinic-dev
+  labels:
+    app: genai-service
+    tier: backend
+    app.kubernetes.io/name: genai-service
+    app.kubernetes.io/part-of: petclinic
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  selector:
+    app: genai-service
+  ports:
+    - protocol: TCP
+      port: 8084
+      targetPort: 8084
+---

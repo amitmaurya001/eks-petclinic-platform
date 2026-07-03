@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name | default .Release.Name }}
+  namespace: {{ .Values.namespace | default "petclinic-dev" }}
+  labels:
+    {{- include "petclinic-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.component | default "service" }}
+    app: {{ .Values.name | default .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "petclinic-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "petclinic-service.labels" . | nindent 8 }}
+        app: {{ .Values.name | default .Release.Name }}
+        app.kubernetes.io/component: {{ .Values.component | default "service" }}
+    spec:
+      {{- if .Values.serviceAccount.name }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      {{- if .Values.initContainers }}
+      initContainers:
+        {{- toYaml .Values.initContainers | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Values.name | default .Release.Name }}
+          image: {{ include "petclinic-service.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          {{- if .Values.env }}
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+            {{- if .Values.database }}
+            - name: SPRING_DATASOURCE_URL
+              value: {{ .Values.database.url | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.envFrom }}
+          envFrom:
+            {{- toYaml .Values.envFrom | nindent 10 }}
+          {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.startupProbe.path }}
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds | default 0 }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds | default 10 }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold | default 30 }}
+            timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds | default 5 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds | default 30 }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds | default 10 }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold | default 3 }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds | default 5 }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds | default 60 }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds | default 15 }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold | default 3 }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds | default 5 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml .Values.volumeMounts | nindent 12 }}
+          {{- end }}
+      {{- if .Values.volumes }}
+      volumes:
+        {{- toYaml .Values.volumes | nindent 6 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 60 }}

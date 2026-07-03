@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: discovery-server
+    namespace: petclinic-dev
+    labels:
+        app: discovery-server
+        app.kubernetes.io/name: discovery-server
+        app.kubernetes.io/part-of: petclinic
+        app.kubernetes.io/managed-by: Helm
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: discovery-server
+            app.kubernetes.io/part-of: petclinic
+    template:
+        metadata:
+            labels:
+                app: discovery-server
+                app.kubernetes.io/name: discovery-server
+                app.kubernetes.io/part-of: petclinic
+                app.kubernetes.io/managed-by: Helm
+        spec:
+            serviceAccountName: discovery-server-sa
+            securityContext:
+                runAsNonRoot: true
+                runAsUser: 1000
+                fsGroup: 1000
+                seccompProfile:
+                    type: RuntimeDefault
+            initContainers:
+                - name: wait-for-config-server
+                  image: busybox:1.36
+                  command:
+                      [
+                          "sh",
+                          "-c",
+                          "until wget -qO- http://config-server:8888/actuator/health; do echo waiting for config-server; sleep 5; done",
+                      ]
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                          drop:
+                              - ALL
+                      runAsNonRoot: true
+                      runAsUser: 1000
+            containers:
+                - name: discovery-server
+                  image: 478468080326.dkr.ecr.us-east-1.amazonaws.com/petclinic-dev/discovery-server:85ed54d
+                  imagePullPolicy: Always
+                  ports:
+                      - containerPort: 8761
+                        name: http
+                  env:
+                      - name: SPRING_PROFILES_ACTIVE
+                        value: docker
+                      - name: CONFIG_SERVER_URL
+                        valueFrom:
+                            configMapKeyRef:
+                                name: discovery-server-config
+                                key: CONFIG_SERVER_URL
+                  startupProbe:
+                      httpGet:
+                          path: /actuator/health
+                          port: 8761
+                      periodSeconds: 10
+                      failureThreshold: 30
+                      timeoutSeconds: 5
+                  readinessProbe:
+                      httpGet:
+                          path: /actuator/health/readiness
+                          port: 8761
+                      periodSeconds: 10
+                      failureThreshold: 3
+                      timeoutSeconds: 5
+                  livenessProbe:
+                      httpGet:
+                          path: /actuator/health/liveness
+                          port: 8761
+                      periodSeconds: 15
+                      failureThreshold: 3
+                      timeoutSeconds: 5
+                  resources:
+                      requests:
+                          cpu: 100m
+                          memory: 128Mi
+                      limits:
+                          cpu: 500m
+                          memory: 512Mi
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                          drop:
+                              - ALL
+                      readOnlyRootFilesystem: false
+---

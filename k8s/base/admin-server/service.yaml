@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-server
+  namespace: petclinic-dev
+  labels:
+    app: admin-server
+    component: admin
+    app.kubernetes.io/name: admin-server
+    app.kubernetes.io/part-of: petclinic
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  selector:
+    app: admin-server
+  ports:
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+---
