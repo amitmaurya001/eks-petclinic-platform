@@ -9,20 +9,15 @@
 name: genai-service
 namespace: "petclinic-dev"
 component: service
-
 replicaCount: 1
-
 image:
   repository: "478468080326.dkr.ecr.us-east-1.amazonaws.com/petclinic-dev/genai-service"
-  tag: "85ed54d"
+  tag: "ae0fed8b3ac170851cf29899b0892baeaa290e16"
   pullPolicy: Always
-
 service:
   port: 8084
-
 serviceAccount:
   name: genai-service
-
 initContainers:
   - name: wait-for-config-server
     image: busybox:1.36
@@ -30,7 +25,6 @@ initContainers:
   - name: wait-for-discovery-server
     image: busybox:1.36
     waitFor: discovery-server
-
 env:
   - name: SPRING_PROFILES_ACTIVE
     value: docker
@@ -41,11 +35,8 @@ env:
       secretKeyRef:
         name: openai-api-key
         key: OPENAI_API_KEY
-
-
 configMap:
   CONFIG_SERVER_URL: http://config-server:8888
-
 probes:
   readiness:
     path: /actuator/health/readiness
@@ -59,7 +50,6 @@ probes:
     periodSeconds: 15
     failureThreshold: 3
     timeoutSeconds: 5
-
 startupProbe:
   enabled: true
   path: /actuator/health
@@ -67,7 +57,6 @@ startupProbe:
   periodSeconds: 10
   failureThreshold: 30
   timeoutSeconds: 5
-
 resources:
   requests:
     cpu: 100m
@@ -75,9 +64,7 @@ resources:
   limits:
     cpu: 500m
     memory: 512Mi
-
 autoscaling:
   enabled: false
-
 podDisruptionBudget:
   enabled: false
