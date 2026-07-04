@@ -12,7 +12,7 @@ component: service
 replicaCount: 1
 image:
   repository: "478468080326.dkr.ecr.us-east-1.amazonaws.com/petclinic-dev/genai-service"
-  tag: "cc947cbbdf679b5c6c3613da29644d7638d4ddbd"
+  tag: "6c8d3f6c34392763955e3ba6ea3d6b97cc7955b2"
   pullPolicy: Always
 service:
   port: 8084
